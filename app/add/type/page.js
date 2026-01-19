@@ -55,6 +55,38 @@ export default function TypeItemsPage() {
     }
   };
 
+  // Handle paste - split on newlines so each line becomes a separate item
+  const handlePaste = (index, e) => {
+    const pastedText = e.clipboardData.getData('text');
+
+    // Check if paste contains newlines (handle both \n and \r\n)
+    if (pastedText.includes('\n') || pastedText.includes('\r')) {
+      e.preventDefault();
+
+      // Split by any newline variant, trim, and filter empty lines
+      const pastedLines = pastedText
+        .split(/\r?\n|\r/)
+        .map(line => line.trim())
+        .filter(line => line !== '');
+
+      if (pastedLines.length > 0) {
+        const newLines = [...lines];
+        // Replace current line with first pasted line
+        newLines[index] = pastedLines[0];
+        // Insert remaining lines after current
+        for (let i = 1; i < pastedLines.length; i++) {
+          newLines.splice(index + i, 0, pastedLines[i]);
+        }
+        setLines(newLines);
+
+        // Focus the last added line
+        setTimeout(() => {
+          inputRefs.current[index + pastedLines.length - 1]?.focus();
+        }, 0);
+      }
+    }
+  };
+
   const handleSubmit = async () => {
     const items = lines.filter((line) => line.trim() !== '');
     if (items.length === 0) return;
@@ -92,6 +124,7 @@ export default function TypeItemsPage() {
     if (result.success) {
       toast.success(`${result.count} items added to fridge!`);
       setPendingBatchResult(null);
+      setLines(['']); // Clear input after successful add
       closeModal();
       router.push('/fridge');
     } else {
@@ -99,7 +132,21 @@ export default function TypeItemsPage() {
     }
   };
 
-  const filledLines = lines.filter((line) => line.trim() !== '').length;
+  // Count total items including comma-separated items within lines
+  const countItems = () => {
+    let count = 0;
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed) {
+        // Count comma-separated items
+        const items = trimmed.split(',').map(s => s.trim()).filter(s => s !== '');
+        count += items.length;
+      }
+    });
+    return count;
+  };
+
+  const itemCount = countItems();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-500 via-slate-600 to-slate-700 relative overflow-hidden">
@@ -181,7 +228,7 @@ export default function TypeItemsPage() {
                     Shopping List
                   </h2>
                   <p className="text-xs text-slate-400">
-                    Type each item, press Enter for new line
+                    Type items or paste a list
                   </p>
                 </div>
 
@@ -205,6 +252,7 @@ export default function TypeItemsPage() {
                         value={line}
                         onChange={(e) => handleLineChange(index, e.target.value)}
                         onKeyDown={(e) => handleKeyDown(index, e)}
+                        onPaste={(e) => handlePaste(index, e)}
                         placeholder={index === 0 ? 'milk, eggs, bread...' : ''}
                         className="w-full py-2 bg-transparent text-slate-700 placeholder-slate-300 focus:outline-none text-sm sm:text-base"
                         style={{ fontFamily: "'Patrick Hand', cursive, sans-serif" }}
@@ -216,11 +264,11 @@ export default function TypeItemsPage() {
                 {/* Footer */}
                 <div className="pl-14 sm:pl-16 pr-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
                   <span className="text-xs text-slate-400">
-                    {filledLines} item{filledLines !== 1 ? 's' : ''}
+                    {itemCount} item{itemCount !== 1 ? 's' : ''}
                   </span>
                   <button
                     onClick={handleSubmit}
-                    disabled={filledLines === 0 || isLoading}
+                    disabled={itemCount === 0 || isLoading}
                     className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
                   >
                     {isLoading ? (

@@ -4,6 +4,7 @@ import { logError, createErrorResponse, validateInput } from '../../../lib/error
 import { parseItems, processItems } from '../../../lib/localParser';
 import { lookupShelfLife, inferCategory, DEFAULT_SHELF_LIFE } from '../../../lib/shelfLifeDatabase';
 import { checkRateLimit, clampShelfLifeDays, getExpiryStatusSafe } from '../../../lib/validation';
+import { assignStorageLocation } from '../../../lib/storageLocationAssigner';
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.error("❌ ANTHROPIC_API_KEY environment variable is not set");
@@ -198,9 +199,13 @@ export async function POST(request) {
         daysUntilExpiry: safeDays,
         status: getExpiryStatusSafe(expiryDateStr),
         source: item.source || 'USDA',
+        // CRITICAL: Include dateType for safety vs quality distinction
+        dateType: item.dateType || 'quality',
         confidence: 'high',
         isPerishable: true,
         storageRecommendations: getStorageTip(item.name, item.category),
+        // Storage location auto-assigned by localParser
+        storageLocation: item.storageLocation,
       });
     }
 
@@ -211,6 +216,10 @@ export async function POST(request) {
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + safeDays);
       const expiryDateStr = expiryDate.toISOString().split('T')[0];
+
+      // Determine dateType for AI items based on category and foodType
+      // High-risk foods (raw meat, poultry, fish, leftovers) = safety dates
+      const aiDateType = determineAIDateType(item);
 
       finalItems.push({
         name: item.name,
@@ -224,9 +233,13 @@ export async function POST(request) {
         daysUntilExpiry: safeDays,
         status: getExpiryStatusSafe(expiryDateStr),
         source: 'AI',
+        // CRITICAL: Include dateType for safety vs quality distinction
+        dateType: aiDateType,
         confidence: 'medium',
         isPerishable: true,
         storageRecommendations: item.storageRecommendations || getStorageTip(item.name, item.category),
+        // Auto-assign storage location for AI items
+        storageLocation: assignStorageLocation({ name: item.name, category: item.category, modifier: item.modifier }),
       });
     }
 
@@ -285,4 +298,54 @@ function getStorageTip(name, category) {
   }
 
   return tips[category] || tips.Other;
+}
+
+/**
+ * Determine dateType for AI-parsed items based on category and foodType
+ * High-risk foods should be marked as 'safety' dates, others as 'quality'
+ *
+ * Safety dates (FDA guidelines - consume by date):
+ * - Raw poultry, meat, fish, seafood
+ * - Leftovers and premade foods
+ * - Ground meats
+ *
+ * Quality dates (USDA FoodKeeper - peak freshness):
+ * - Everything else
+ */
+function determineAIDateType(item) {
+  const name = (item.name || '').toLowerCase();
+  const category = (item.category || '').toLowerCase();
+  const foodType = (item.foodType || '').toLowerCase();
+
+  // Leftovers and premade items are ALWAYS safety dates
+  if (foodType === 'leftover' || foodType === 'premade') {
+    return 'safety';
+  }
+
+  // Meat category items need further analysis
+  if (category === 'meat') {
+    // Raw poultry - safety
+    if (name.includes('chicken') || name.includes('turkey') ||
+        name.includes('duck') || name.includes('poultry')) {
+      return 'safety';
+    }
+    // Ground meats - safety
+    if (name.includes('ground')) {
+      return 'safety';
+    }
+    // Fish and seafood - safety
+    if (name.includes('fish') || name.includes('salmon') ||
+        name.includes('tuna') || name.includes('shrimp') ||
+        name.includes('crab') || name.includes('lobster') ||
+        name.includes('seafood') || name.includes('shellfish')) {
+      return 'safety';
+    }
+    // Raw/fresh meats (not processed) - safety
+    if (name.includes('raw') || name.includes('fresh')) {
+      return 'safety';
+    }
+  }
+
+  // Default to quality for all other items
+  return 'quality';
 }

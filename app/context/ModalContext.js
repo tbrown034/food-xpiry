@@ -1,7 +1,6 @@
 'use client';
 
-import { createContext, useContext, useCallback } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { createContext, useContext, useCallback, useState } from 'react';
 
 const ModalContext = createContext(null);
 
@@ -20,43 +19,31 @@ export const MODAL_TYPES = {
 };
 
 export function ModalProvider({ children }) {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
+  // Use useState instead of URL search params
+  // This avoids browser history pollution and removes need for Suspense
+  const [modalState, setModalState] = useState({
+    type: MODAL_TYPES.NONE,
+    id: null,
+  });
 
-  // Get current modal state from URL
-  const modalType = searchParams.get('modal') || MODAL_TYPES.NONE;
-  const modalId = searchParams.get('id') || null;
-
-  // Open modal by updating URL search params
+  // Open modal by updating state
   const openModal = useCallback((type, id = null) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('modal', type);
-    if (id) {
-      params.set('id', id);
-    } else {
-      params.delete('id');
-    }
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [searchParams, router, pathname]);
+    setModalState({ type, id });
+  }, []);
 
-  // Close modal by removing modal params from URL
+  // Close modal by resetting state
   const closeModal = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('modal');
-    params.delete('id');
-    const queryString = params.toString();
-    router.push(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
-  }, [searchParams, router, pathname]);
+    setModalState({ type: MODAL_TYPES.NONE, id: null });
+  }, []);
 
   // Check if a specific modal is open
   const isModalOpen = useCallback((type) => {
-    return modalType === type;
-  }, [modalType]);
+    return modalState.type === type;
+  }, [modalState.type]);
 
   const value = {
-    modalType,
-    modalId,
+    modalType: modalState.type,
+    modalId: modalState.id,
     openModal,
     closeModal,
     isModalOpen,

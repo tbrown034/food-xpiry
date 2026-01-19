@@ -224,7 +224,7 @@ export default function HistoryPage() {
                       }`}
                     >
                       <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
-                        <span className="text-xl">{getFoodEmoji(item.name, item.category)}</span>
+                        <span className="text-xl">{getFoodEmoji(item)}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-slate-800 truncate">{item.name}</div>

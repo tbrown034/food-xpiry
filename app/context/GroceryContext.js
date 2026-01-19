@@ -3,6 +3,8 @@
 import { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import { storage } from '../../lib/storage';
 import { calculateDaysUntilExpiry, getExpiryStatus } from '../../lib/utils';
+import { assignStorageLocation, calculateExpiryDate } from '../../lib/storageLocationAssigner';
+import { StorageLocation } from '../../lib/types';
 
 const GroceryContext = createContext(null);
 
@@ -61,7 +63,29 @@ export function GroceryProvider({ children }) {
   useEffect(() => {
     const loadGroceries = () => {
       try {
-        const stored = storage.getGroceries();
+        let stored = storage.getGroceries();
+
+        // Migration: Add storageLocation to items that don't have it
+        const needsMigration = stored.some(item => !item.storageLocation);
+        if (needsMigration) {
+          stored = stored.map(item => {
+            if (item.storageLocation) return item;
+            // Assign storage location based on item properties
+            return {
+              ...item,
+              storageLocation: assignStorageLocation({
+                name: item.name,
+                category: item.category,
+                modifier: item.modifier || ''
+              }),
+              updatedAt: new Date().toISOString()
+            };
+          });
+          // Persist migrated items
+          storage.saveGroceries(stored);
+          console.log('Migrated storage locations for existing items');
+        }
+
         const enriched = stored.map(enrichGrocery);
         dispatch({ type: ACTIONS.SET, groceries: enriched });
       } catch {
@@ -232,6 +256,48 @@ export function GroceryProvider({ children }) {
     }
   }, []);
 
+  // Change storage location (fridge/freezer/pantry)
+  // Auto-updates shelf life based on new location
+  const changeStorageLocation = useCallback((id, newLocation) => {
+    try {
+      const item = groceries.find(g => g.id === id);
+      if (!item) {
+        return { success: false, error: 'Item not found' };
+      }
+
+      const updates = { storageLocation: newLocation };
+
+      // Update shelf life based on new location
+      // Freezer items last much longer, pantry items have different timelines
+      if (newLocation === StorageLocation.FREEZER && item.shelfLifeDays < 180) {
+        // Moving to freezer - extend shelf life significantly
+        updates.shelfLifeDays = 365; // 1 year default for frozen
+        updates.expiryDate = calculateExpiryDate(365, new Date(item.purchaseDate));
+        updates.source = 'USDA (frozen)';
+      } else if (newLocation === StorageLocation.FRIDGE && item.storageLocation === StorageLocation.FREEZER) {
+        // Moving from freezer to fridge - thawed items have shorter life
+        // Use 3-5 days for thawed items per USDA guidelines
+        updates.shelfLifeDays = 4;
+        updates.expiryDate = calculateExpiryDate(4, new Date());
+        updates.source = 'USDA (thawed)';
+      }
+
+      const result = updateGrocery(id, updates);
+
+      if (result.success) {
+        return {
+          success: true,
+          grocery: result.grocery,
+          shelfLifeChanged: !!updates.shelfLifeDays,
+          newShelfLife: updates.shelfLifeDays || item.shelfLifeDays
+        };
+      }
+      return result;
+    } catch {
+      return { success: false, error: 'Failed to change storage location' };
+    }
+  }, [groceries, updateGrocery]);
+
   // Get grocery by ID
   const getGroceryById = useCallback((id) => {
     return groceries.find(g => g.id === id) || null;
@@ -247,6 +313,7 @@ export function GroceryProvider({ children }) {
     clearAll,
     markAsEaten,
     markAsExpired,
+    changeStorageLocation,
     getGroceryById,
     // New validation methods
     checkStorage,

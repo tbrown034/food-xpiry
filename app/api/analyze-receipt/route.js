@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { ExpiryStatus } from "../../../lib/types";
 import sharp from "sharp";
 
@@ -14,7 +15,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 // ==================== FILE VALIDATION & LIMITS ====================
 
 const RECEIPT_LIMITS = {
-  MAX_FILE_SIZE: 20 * 1024 * 1024,  // 20MB
+  MAX_FILE_SIZE: 5 * 1024 * 1024,   // 5MB (reduced from 20MB for security)
   MAX_IMAGE_DIMENSION: 4096,         // pixels
   ALLOWED_IMAGE_TYPES: [
     'image/jpeg',
@@ -39,10 +40,19 @@ const RATE_LIMITS = {
 // Simple in-memory rate limiter (production: use Redis)
 const rateLimits = new Map();
 
+function getClientIP(headersList) {
+  // Try various headers for client IP
+  const forwardedFor = headersList.get('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0].trim();
+  }
+  return headersList.get('x-real-ip') || 'anonymous';
+}
+
 function validateFile(file) {
   // Size check
   if (file.size > RECEIPT_LIMITS.MAX_FILE_SIZE) {
-    throw new Error(`File too large. Maximum size is 20MB (yours is ${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+    throw new Error(`File too large. Maximum size is 5MB (yours is ${(file.size / 1024 / 1024).toFixed(1)}MB)`);
   }
 
   // Type check
@@ -521,16 +531,21 @@ export async function POST(request) {
       );
     }
 
+    // Get client IP for rate limiting (more secure than client-provided userId)
+    const headersList = await headers();
+    const clientIP = getClientIP(headersList);
+
     const formData = await request.formData();
     const file = formData.get("file");
-    const userId = formData.get("userId") || 'anonymous';
 
     if (!file) {
       console.error("No file provided in request");
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    console.log(`📄 File: ${file.name} (${file.size} bytes, ${file.type})`);
+    // Sanitize filename for logging (prevent log injection)
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100);
+    console.log(`📄 File: ${safeFileName} (${file.size} bytes, ${file.type})`);
 
     // ==================== VALIDATION & RATE LIMITING ====================
 
@@ -545,9 +560,9 @@ export async function POST(request) {
       );
     }
 
-    // Step 2: Check rate limits
+    // Step 2: Check rate limits (using IP, not client-provided userId)
     try {
-      checkRateLimit(userId);
+      checkRateLimit(clientIP);
     } catch (rateLimitError) {
       console.error("❌ Rate limit exceeded:", rateLimitError.message);
       return NextResponse.json(
@@ -660,7 +675,7 @@ export async function POST(request) {
     try {
       message = await anthropic.beta.messages.create({
         ...messageConfig,
-        betas: ["structured-outputs-2025-11-13"]
+        betas: ["pdfs-2024-09-25", "structured-outputs-2025-11-13"]
       });
       console.log("✅ AI TRIP: Completed analysis");
       console.log(`💭 Thinking tokens used: ${message.usage?.thinking_tokens || 0}`);
@@ -729,6 +744,9 @@ export async function POST(request) {
         (new Date(expiryDateString) - new Date()) / (1000 * 60 * 60 * 24)
       );
 
+      // Determine dateType based on category and foodType
+      const dateType = determineReceiptDateType(item.name, item.category, item.foodType);
+
       return {
         name: item.name,
         originalName: item.originalName || item.name,
@@ -743,6 +761,8 @@ export async function POST(request) {
         addedManually: false,
         status: getExpiryStatus(expiryDateString),
         storageRecommendations: item.storageRecommendations || null,
+        // CRITICAL: Include dateType for safety vs quality distinction
+        dateType: dateType,
       };
     });
 
@@ -797,4 +817,52 @@ export async function POST(request) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Determine dateType for receipt items
+ * High-risk foods should be marked as 'safety' dates, others as 'quality'
+ */
+function determineReceiptDateType(name, category, foodType) {
+  const lowerName = (name || '').toLowerCase();
+  const lowerCategory = (category || '').toLowerCase();
+  const lowerFoodType = (foodType || '').toLowerCase();
+
+  // Premade and leftover items are ALWAYS safety dates
+  if (lowerFoodType === 'premade' || lowerFoodType === 'leftover') {
+    return 'safety';
+  }
+
+  // Leftovers in name
+  if (lowerName.includes('leftover') || lowerName.includes('cooked')) {
+    return 'safety';
+  }
+
+  // Meat category items need further analysis
+  if (lowerCategory === 'meat') {
+    // Raw poultry - safety
+    if (lowerName.includes('chicken') || lowerName.includes('turkey') ||
+        lowerName.includes('duck') || lowerName.includes('poultry')) {
+      return 'safety';
+    }
+    // Ground meats - safety
+    if (lowerName.includes('ground')) {
+      return 'safety';
+    }
+    // Fish and seafood - safety
+    if (lowerName.includes('fish') || lowerName.includes('salmon') ||
+        lowerName.includes('tuna') || lowerName.includes('shrimp') ||
+        lowerName.includes('crab') || lowerName.includes('lobster') ||
+        lowerName.includes('seafood') || lowerName.includes('shellfish') ||
+        lowerName.includes('tilapia') || lowerName.includes('cod')) {
+      return 'safety';
+    }
+    // Raw meats - safety
+    if (lowerName.includes('raw') || lowerName.includes('fresh')) {
+      return 'safety';
+    }
+  }
+
+  // Default to quality for all other items
+  return 'quality';
 }

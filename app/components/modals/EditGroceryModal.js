@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { formatGroceryName, formatCategoryName } from '../../../lib/utils';
+import { StorageLocation } from '../../../lib/types';
 import {
   LIMITS,
   validateItemName,
@@ -15,7 +16,8 @@ export default function EditGroceryModal({ grocery, onSave, onCancel }) {
     category: 'other',
     purchaseDate: '',
     expiryDate: '',
-    quantity: 1
+    quantity: 1,
+    storageLocation: StorageLocation.FRIDGE
   });
   const [errors, setErrors] = useState({});
 
@@ -26,7 +28,8 @@ export default function EditGroceryModal({ grocery, onSave, onCancel }) {
         category: grocery.category || 'other',
         purchaseDate: grocery.purchaseDate || '',
         expiryDate: grocery.expiryDate || '',
-        quantity: grocery.quantity || 1
+        quantity: grocery.quantity || 1,
+        storageLocation: grocery.storageLocation || StorageLocation.FRIDGE
       });
       setErrors({});
     }
@@ -66,7 +69,8 @@ export default function EditGroceryModal({ grocery, onSave, onCancel }) {
       ...formData,
       name: nameValidation.sanitized,
       purchaseDate: purchaseDateToValidate,
-      quantity: formData.quantity
+      quantity: formData.quantity,
+      storageLocation: formData.storageLocation
     };
 
     onSave(updatedGrocery);
@@ -168,6 +172,51 @@ export default function EditGroceryModal({ grocery, onSave, onCancel }) {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Storage Location */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Storage Location
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, storageLocation: StorageLocation.FREEZER }))}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                  formData.storageLocation === StorageLocation.FREEZER
+                    ? 'bg-cyan-500 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-cyan-50'
+                }`}
+              >
+                <span>❄️</span>
+                <span>Freezer</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, storageLocation: StorageLocation.FRIDGE }))}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                  formData.storageLocation === StorageLocation.FRIDGE
+                    ? 'bg-slate-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <span>🧊</span>
+                <span>Fridge</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, storageLocation: StorageLocation.PANTRY }))}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                  formData.storageLocation === StorageLocation.PANTRY
+                    ? 'bg-amber-500 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-amber-50'
+                }`}
+              >
+                <span>🏠</span>
+                <span>Pantry</span>
+              </button>
+            </div>
           </div>
 
           <div>

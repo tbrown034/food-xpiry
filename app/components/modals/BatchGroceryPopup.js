@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Category } from '../../../lib/types';
+import { Category, StorageLocation } from '../../../lib/types';
 import { getFoodEmoji } from '../../../lib/foodEmojis';
 import { Magnet } from '../svg';
 import {
@@ -61,6 +61,7 @@ export default function BatchGroceryPopup({ batchResult, onConfirm, onCancel }) 
       source: item.source,
       confidence: item.confidence,
       quantity: item.quantity || 1,
+      storageLocation: item.storageLocation || StorageLocation.FRIDGE,
     }));
 
     // Check if we already have shelf life data
@@ -173,6 +174,7 @@ export default function BatchGroceryPopup({ batchResult, onConfirm, onCancel }) 
         source: item.source,
         confidence: item.confidence,
         quantity: item.quantity || 1,
+        storageLocation: item.storageLocation || StorageLocation.FRIDGE,
         addedManually: true
       };
     });
@@ -267,7 +269,7 @@ export default function BatchGroceryPopup({ batchResult, onConfirm, onCancel }) 
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-slate-800 tracking-tight">
-                Add to Fridge?
+                Add to Kitchen?
               </h2>
               <p className="text-sm text-slate-500 mt-0.5">
                 {items.length} items ready to add
@@ -349,7 +351,7 @@ export default function BatchGroceryPopup({ batchResult, onConfirm, onCancel }) 
                     <div className="flex items-center gap-3">
                       {/* Emoji with premium container */}
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center flex-shrink-0 shadow-sm ring-1 ring-slate-100">
-                        <span className="text-2xl">{getFoodEmoji(item.name, item.category)}</span>
+                        <span className="text-2xl">{getFoodEmoji(item)}</span>
                       </div>
 
                       {/* Info */}
@@ -366,6 +368,43 @@ export default function BatchGroceryPopup({ batchResult, onConfirm, onCancel }) 
                             </>
                           )}
                         </div>
+                      </div>
+
+                      {/* Storage location toggle */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateItem(item.id, 'storageLocation', StorageLocation.FREEZER)}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all ${
+                            item.storageLocation === StorageLocation.FREEZER
+                              ? 'bg-cyan-500 text-white shadow-md'
+                              : 'bg-slate-100 hover:bg-cyan-100 text-slate-500'
+                          }`}
+                          title="Freezer"
+                        >
+                          ❄️
+                        </button>
+                        <button
+                          onClick={() => updateItem(item.id, 'storageLocation', StorageLocation.FRIDGE)}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all ${
+                            item.storageLocation === StorageLocation.FRIDGE
+                              ? 'bg-slate-600 text-white shadow-md'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-500'
+                          }`}
+                          title="Fridge"
+                        >
+                          🧊
+                        </button>
+                        <button
+                          onClick={() => updateItem(item.id, 'storageLocation', StorageLocation.PANTRY)}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all ${
+                            item.storageLocation === StorageLocation.PANTRY
+                              ? 'bg-amber-500 text-white shadow-md'
+                              : 'bg-slate-100 hover:bg-amber-100 text-slate-500'
+                          }`}
+                          title="Pantry"
+                        >
+                          🏠
+                        </button>
                       </div>
 
                       {/* Quantity adjuster */}

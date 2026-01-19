@@ -46,28 +46,44 @@ export default function TypeItemsPage({ onSubmit, onBack, isLoading }) {
     }
   };
 
-  // Handle paste - split on newlines and commas
+  // Handle paste - split on newlines so each line becomes a separate item
   const handlePaste = (index, e) => {
     const pastedText = e.clipboardData.getData('text');
 
-    // Check if paste contains newlines
-    if (pastedText.includes('\n')) {
+    // Check if paste contains newlines (handle both \n and \r\n)
+    if (pastedText.includes('\n') || pastedText.includes('\r')) {
       e.preventDefault();
 
-      // Split by newlines, then flatten any comma-separated items
+      // Get cursor position to handle paste at correct location
+      const input = inputRefs.current[index];
+      const cursorPos = input?.selectionStart || 0;
+      const currentLine = lines[index];
+      const beforeCursor = currentLine.slice(0, cursorPos);
+      const afterCursor = currentLine.slice(cursorPos);
+
+      // Split by any newline variant, trim each line
       const pastedLines = pastedText
-        .split('\n')
+        .split(/\r?\n|\r/)
         .map(line => line.trim())
         .filter(line => line !== '');
 
       if (pastedLines.length > 0) {
         const newLines = [...lines];
-        // Replace current line with first pasted line
-        newLines[index] = pastedLines[0];
-        // Insert remaining lines after current
+
+        // First line: combine text before cursor + first pasted line
+        newLines[index] = (beforeCursor + pastedLines[0]).trim();
+
+        // Middle lines: insert as-is
         for (let i = 1; i < pastedLines.length; i++) {
           newLines.splice(index + i, 0, pastedLines[i]);
         }
+
+        // Last line: if there was text after cursor, append it to the last pasted line
+        if (afterCursor.trim()) {
+          const lastIndex = index + pastedLines.length - 1;
+          newLines[lastIndex] = (newLines[lastIndex] + ' ' + afterCursor).trim();
+        }
+
         setLines(newLines);
 
         // Focus the last added line
@@ -165,7 +181,7 @@ export default function TypeItemsPage({ onSubmit, onBack, isLoading }) {
                 {/* Header area */}
                 <div className="relative pl-14 sm:pl-16 pr-4 pt-5 pb-3 border-b border-slate-100">
                   <h2 className="text-lg font-bold text-slate-800 tracking-tight">What I Bought</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Type each item, press Enter for new line</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Type items or paste a list</p>
                 </div>
 
                 {/* Lines area - scrollable */}

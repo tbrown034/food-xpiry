@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useGroceries, useToast, useModal, MODAL_TYPES } from '../context';
-import FridgeContents from '../components/ui/FridgeContents';
+import KitchenContents from '../components/ui/KitchenContents';
 import Modal from '../components/modals/Modal';
 import ConfirmationModal from '../components/modals/ConfirmationModal';
 import GroceryDetailModal from '../components/modals/GroceryDetailModal';
@@ -20,7 +20,7 @@ import { calculateDaysUntilExpiry, getExpiryStatus } from '../../lib/utils';
 
 export default function FridgePage() {
   const router = useRouter();
-  const { groceries, addGrocery, addBatch, updateGrocery, deleteGrocery, clearAll, markAsEaten, markAsExpired, getGroceryById } = useGroceries();
+  const { groceries, addGrocery, addBatch, updateGrocery, deleteGrocery, clearAll, markAsEaten, markAsExpired, changeStorageLocation, getGroceryById } = useGroceries();
   const toast = useToast();
   const { modalType, modalId, openModal, closeModal, isModalOpen } = useModal();
 
@@ -60,6 +60,21 @@ export default function FridgePage() {
     }
   };
 
+  const handleChangeLocation = (id, newLocation) => {
+    const result = changeStorageLocation(id, newLocation);
+    if (result.success) {
+      const locationLabels = { fridge: 'Fridge', freezer: 'Freezer', pantry: 'Pantry' };
+      const label = locationLabels[newLocation] || newLocation;
+      if (result.shelfLifeChanged) {
+        toast.success(`Moved to ${label} - shelf life updated`);
+      } else {
+        toast.success(`Moved to ${label}`);
+      }
+    } else {
+      toast.error(result.error);
+    }
+  };
+
   const handleClearAll = () => {
     openModal(MODAL_TYPES.CLEAR_CONFIRM);
   };
@@ -76,6 +91,38 @@ export default function FridgePage() {
 
   const handleEditItem = (id) => {
     openModal(MODAL_TYPES.EDIT, id);
+  };
+
+  // Mark an item as leftover - caps shelf life at 4 days per FDA guidelines
+  const handleMarkAsLeftover = (id) => {
+    const grocery = getGroceryById(id);
+    if (!grocery) {
+      toast.error('Item not found');
+      return;
+    }
+
+    // Calculate new expiry date: today + 4 days (FDA guideline for leftovers)
+    const today = new Date();
+    const newExpiryDate = new Date(today);
+    newExpiryDate.setDate(newExpiryDate.getDate() + 4);
+    const expiryDateString = newExpiryDate.toISOString().split('T')[0];
+
+    const result = updateGrocery(id, {
+      category: 'leftovers',
+      foodType: 'leftover',
+      expiryDate: expiryDateString,
+      shelfLifeDays: 4,
+      daysUntilExpiry: 4,
+      status: 'fresh',
+      source: 'FDA (leftover guideline)',
+      storageRecommendations: 'Refrigerate promptly. Use within 3-4 days. Reheat to 165°F (74°C) before eating.',
+    });
+
+    if (result.success) {
+      toast.success('Marked as leftover - use within 4 days');
+    } else {
+      toast.error(result.error);
+    }
   };
 
   const handleSaveEdit = (updatedData) => {
@@ -239,7 +286,7 @@ export default function FridgePage() {
               Close
             </Link>
             <div className="flex-1 text-center">
-              <span className="text-sm font-medium text-slate-500">My Fridge</span>
+              <span className="text-sm font-medium text-slate-500">My Kitchen</span>
             </div>
             {groceries.length > 0 && (
               <button
@@ -266,11 +313,12 @@ export default function FridgePage() {
 
           {/* Main content - always show shelves */}
           <div className="flex-1 overflow-auto relative z-10">
-            <FridgeContents
+            <KitchenContents
               groceries={groceries}
               onItemClick={handleItemClick}
               onMarkAsEaten={handleMarkAsEaten}
               onDeleteItem={handleDeleteItem}
+              onChangeLocation={handleChangeLocation}
             />
           </div>
 
@@ -396,6 +444,8 @@ export default function FridgePage() {
           onEdit={handleEditItem}
           onDelete={handleDeleteItem}
           onMarkAsEaten={handleMarkAsEaten}
+          onMarkAsLeftover={handleMarkAsLeftover}
+          onChangeLocation={handleChangeLocation}
           onClose={closeModal}
         />
       )}

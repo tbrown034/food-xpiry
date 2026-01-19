@@ -34,13 +34,15 @@ export default function FridgeContents({
   };
 
   // Group items by urgency for the 3 shelves (exclude eaten items - they go to history page)
-  const { useSoon, thisWeek, crisper } = useMemo(() => {
+  const { expired, useSoon, thisWeek, crisper } = useMemo(() => {
     const activeItems = groceries.filter(i => !i.eaten);
     const sorted = [...activeItems].sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
 
     return {
-      // Use Soon: expired + within 3 days
-      useSoon: groupItems(sorted.filter(i => i.daysUntilExpiry <= 3)),
+      // Expired: past due items (daysUntilExpiry < 0)
+      expired: groupItems(sorted.filter(i => i.daysUntilExpiry < 0)),
+      // Use Soon: today through 3 days (0-3)
+      useSoon: groupItems(sorted.filter(i => i.daysUntilExpiry >= 0 && i.daysUntilExpiry <= 3)),
       // This Week: 4-7 days
       thisWeek: groupItems(sorted.filter(i => i.daysUntilExpiry > 3 && i.daysUntilExpiry <= 7)),
       // Crisper: more than a week
@@ -48,17 +50,31 @@ export default function FridgeContents({
     };
   }, [groceries]);
 
-  // Get display text for expiry - shows remaining freshness
+  // Count total expired items for the clear all button
+  const expiredCount = expired.reduce((sum, item) => sum + (item.quantity || 1), 0);
+
+  // Handle clear all expired
+  const handleClearAllExpired = () => {
+    setClearConfirm({ show: true, shelfName: 'All Expired Items', items: expired });
+  };
+
+  // Get display text for expiry - shows remaining freshness or safety
+  // Uses dateType to distinguish quality dates vs safety dates
   const getDaysText = (item) => {
     if (item.eaten) return 'Eaten';
     const days = item.daysUntilExpiry;
+    const isSafety = item.dateType === 'safety';
+
     if (days < 0) {
       const daysAgo = Math.abs(days);
-      return daysAgo === 1 ? 'Expired 1d' : `Expired ${daysAgo}d`;
+      // Safety items get warning indicator
+      return isSafety
+        ? `⚠️ ${daysAgo}d over`
+        : (daysAgo === 1 ? 'Expired 1d' : `Expired ${daysAgo}d`);
     }
-    if (days === 0) return 'Use today';
-    if (days === 1) return '1d fresh';
-    return `${days}d fresh`;
+    if (days === 0) return isSafety ? 'Use today!' : 'Use today';
+    if (days === 1) return isSafety ? '1d left' : '1d fresh';
+    return isSafety ? `${days}d left` : `${days}d fresh`;
   };
 
   // Get urgency styles - softer, less alarming colors
@@ -73,7 +89,8 @@ export default function FridgeContents({
   // Food item - sits on the shelf
   const FoodItem = ({ item }) => {
     const [showActions, setShowActions] = useState(false);
-    const emoji = getFoodEmoji(item.name, item.category);
+    // Pass whole item for more accurate emoji matching (uses matchedKey if available)
+    const emoji = getFoodEmoji(item);
     const urgencyStyle = getUrgencyStyle(item);
     const quantity = item.quantity || 1;
 
@@ -403,8 +420,45 @@ export default function FridgeContents({
         }}
       />
 
-      {/* Shelves - always show all 3 */}
+      {/* Clear All Expired Banner - shows when there are expired items */}
+      {expiredCount > 0 && (
+        <div className="relative mx-2 mt-2 mb-1">
+          <button
+            onClick={handleClearAllExpired}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 rounded-xl text-white shadow-lg transition-all active:scale-[0.99] cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <span className="font-semibold text-sm">
+                  {expiredCount} Expired Item{expiredCount !== 1 ? 's' : ''}
+                </span>
+                <p className="text-white/80 text-xs">Tap to clear all</p>
+              </div>
+            </div>
+            <svg className="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Shelves */}
       <div className="relative pt-2">
+        {/* Expired - only shows if there are expired items */}
+        {expired.length > 0 && (
+          <GlassShelf
+            title="Expired"
+            subtitle="Past due"
+            items={expired}
+            accentColor="bg-red-500"
+          />
+        )}
+
         {/* Use Soon - top shelf */}
         <GlassShelf
           title="Use Soon"
@@ -423,6 +477,21 @@ export default function FridgeContents({
 
         {/* Crisper Drawer - bottom for fresh items */}
         <CrisperDrawer items={crisper} />
+
+        {/* Food Safety Disclaimer */}
+        <div className="mx-4 mt-4 mb-2 p-3 bg-amber-50/80 border border-amber-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <span className="text-amber-500 text-sm">⚠️</span>
+            <div className="text-xs text-amber-700">
+              <p className="font-medium mb-1">About These Dates</p>
+              <p className="text-amber-600">
+                Most dates are <strong>quality estimates</strong> (peak freshness) from USDA FoodKeeper.
+                Items showing &ldquo;left&rdquo; instead of &ldquo;fresh&rdquo; are <strong>food safety dates</strong> (raw meat, poultry, fish, leftovers) from FDA guidelines.
+                Always trust your senses — if food looks, smells, or feels off, discard it.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Clear All Confirmation Modal */}

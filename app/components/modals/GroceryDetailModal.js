@@ -1,9 +1,15 @@
 'use client';
 
 import { formatGroceryName, formatCategoryName, formatCountdown, calculateHoursUntilExpiry } from '../../../lib/utils';
+import { StorageLocation } from '../../../lib/types';
 
-export default function GroceryDetailModal({ grocery, onEdit, onDelete, onMarkAsEaten, onClose, isOpen }) {
+export default function GroceryDetailModal({ grocery, onEdit, onDelete, onMarkAsEaten, onMarkAsLeftover, onChangeLocation, onClose, isOpen }) {
   if (!grocery || !isOpen) return null;
+
+  // Check if item is already a leftover
+  const isLeftover = grocery.category?.toLowerCase() === 'leftovers' ||
+                     grocery.foodType === 'leftover' ||
+                     grocery.name?.toLowerCase().includes('leftover');
 
   const hoursUntilExpiry = calculateHoursUntilExpiry(grocery.expiryDate);
   const countdown = formatCountdown(hoursUntilExpiry);
@@ -118,12 +124,67 @@ export default function GroceryDetailModal({ grocery, onEdit, onDelete, onMarkAs
                   {countdown}
                 </div>
                 <div className="text-sm text-slate-600">
-                  {hoursUntilExpiry >= 0 ? 'remains fresh' : 'past best-by date'}
+                  {hoursUntilExpiry >= 0
+                    ? (grocery.dateType === 'safety' ? 'safe to consume' : 'remains fresh')
+                    : (grocery.dateType === 'safety' ? 'past safety date' : 'past best-by date')
+                  }
                 </div>
               </div>
 
               {/* Details Grid */}
               <div className="space-y-3">
+                {/* Storage Location */}
+                <div className="bg-white/50 rounded-lg p-3 border border-slate-200">
+                  <div className="text-xs font-semibold text-slate-600 mb-2">📍 Storage Location</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (grocery.storageLocation !== StorageLocation.FREEZER) {
+                          onChangeLocation?.(grocery.id, StorageLocation.FREEZER);
+                        }
+                      }}
+                      className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${
+                        grocery.storageLocation === StorageLocation.FREEZER
+                          ? 'bg-cyan-500 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-600 hover:bg-cyan-50 cursor-pointer'
+                      }`}
+                    >
+                      <span>❄️</span>
+                      <span>Freezer</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (grocery.storageLocation !== StorageLocation.FRIDGE) {
+                          onChangeLocation?.(grocery.id, StorageLocation.FRIDGE);
+                        }
+                      }}
+                      className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${
+                        (grocery.storageLocation === StorageLocation.FRIDGE || !grocery.storageLocation)
+                          ? 'bg-slate-600 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer'
+                      }`}
+                    >
+                      <span>🧊</span>
+                      <span>Fridge</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (grocery.storageLocation !== StorageLocation.PANTRY) {
+                          onChangeLocation?.(grocery.id, StorageLocation.PANTRY);
+                        }
+                      }}
+                      className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${
+                        grocery.storageLocation === StorageLocation.PANTRY
+                          ? 'bg-amber-500 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-600 hover:bg-amber-50 cursor-pointer'
+                      }`}
+                    >
+                      <span>🏠</span>
+                      <span>Pantry</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Quantity & Purchase in a row */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-white/50 rounded-lg p-3 border border-slate-200">
@@ -149,23 +210,60 @@ export default function GroceryDetailModal({ grocery, onEdit, onDelete, onMarkAs
                   </div>
                 )}
 
-                {/* Source & Info */}
+                {/* Source & Info - Enhanced shelf life derivation */}
                 <div className="bg-slate-100 rounded-lg p-3 border border-slate-200">
-                  <div className="text-xs font-semibold text-slate-600 mb-2">ℹ️ Information Source</div>
-                  <div className="text-sm text-slate-700">
-                    {grocery.source ? (
-                      <span>Shelf life data from <span className="font-medium">{grocery.source}</span></span>
-                    ) : (
-                      <span>Based on USDA food safety guidelines</span>
+                  <div className="text-xs font-semibold text-slate-600 mb-2">📊 Shelf Life Derivation</div>
+
+                  {/* Source badge */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`
+                      inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+                      ${grocery.source === 'USDA' || grocery.source === 'FDA' || grocery.source?.includes('USDA') || grocery.source?.includes('FDA')
+                        ? 'bg-green-100 text-green-700'
+                        : grocery.source === 'AI' || grocery.source === 'AI Estimate'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-amber-100 text-amber-700'}
+                    `}>
+                      {grocery.source === 'USDA' || grocery.source?.includes('USDA') ? '✓ USDA FoodKeeper' :
+                       grocery.source === 'FDA' || grocery.source?.includes('FDA') ? '✓ FDA Guidelines' :
+                       grocery.source === 'AI' || grocery.source === 'AI Estimate' ? '🤖 AI Estimate' :
+                       '⚠️ Default Estimate'}
+                    </span>
+                    {grocery.confidence && (
+                      <span className="text-xs text-slate-500">
+                        ({grocery.confidence} confidence)
+                      </span>
                     )}
                   </div>
-                  {grocery.confidence && (
-                    <div className="text-xs text-slate-500 mt-1">
-                      Confidence: {grocery.confidence}
+
+                  {/* Derivation explanation */}
+                  <div className="text-xs text-slate-600 space-y-1">
+                    {grocery.source === 'USDA' || grocery.source?.includes('USDA') ? (
+                      <p>Based on official USDA FoodKeeper refrigeration guidelines for <span className="font-medium">{grocery.category || 'this food type'}</span>.</p>
+                    ) : grocery.source === 'FDA' || grocery.source?.includes('FDA') ? (
+                      <p>Based on FDA food safety guidelines. {isLeftover ? 'Leftovers should be consumed within 3-4 days.' : ''}</p>
+                    ) : grocery.source === 'AI' || grocery.source === 'AI Estimate' ? (
+                      <p>Estimated by AI based on similar foods. Consider using sooner if uncertain.</p>
+                    ) : (
+                      <p>Category-based estimate for <span className="font-medium">{grocery.category || 'general food'}</span>. Verify with packaging if available.</p>
+                    )}
+
+                    {grocery.shelfLifeDays && (
+                      <p className="text-slate-500">
+                        Standard shelf life: <span className="font-medium">{grocery.shelfLifeDays} days</span> when refrigerated at 40°F (4°C) or below.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Safety note for high-risk items - uses dateType from database */}
+                  {grocery.dateType === 'safety' && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                      <span className="font-medium">🛡️ Safety date:</span> This is a food safety date, not just quality. Consume or freeze by this date.
                     </div>
                   )}
-                  <div className="text-xs text-slate-400 mt-2">
-                    Note: Actual freshness may vary based on storage conditions.
+
+                  <div className="text-xs text-slate-400 mt-2 pt-2 border-t border-slate-200">
+                    Always trust your senses — if food looks, smells, or feels off, discard it.
                   </div>
                 </div>
               </div>
@@ -186,6 +284,21 @@ export default function GroceryDetailModal({ grocery, onEdit, onDelete, onMarkAs
                   </svg>
                   Mark as Eaten
                 </button>
+
+                {/* Mark as Leftover button - only show if not already a leftover */}
+                {!isLeftover && onMarkAsLeftover && (
+                  <button
+                    onClick={() => {
+                      onMarkAsLeftover?.(grocery.id);
+                      onClose();
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg font-medium transition-all"
+                    aria-label="Mark as leftover"
+                  >
+                    <span className="text-lg">🍱</span>
+                    Mark as Leftover (4-day limit)
+                  </button>
+                )}
 
                 {/* Secondary actions */}
                 <div className="flex gap-2">
