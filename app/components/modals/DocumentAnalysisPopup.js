@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Category } from '../../../lib/types';
+import { useDialogA11y } from '../../../lib/useDialogA11y';
 
 // Map lowercase API categories to Category enum values
 function normalizeCategory(apiCategory) {
@@ -31,6 +32,7 @@ function normalizeCategory(apiCategory) {
 }
 
 export default function DocumentAnalysisPopup({ analysisResult, onConfirm, onCancel }) {
+  const dialogRef = useDialogA11y(true, onCancel);
   const [items, setItems] = useState([]);
 
   useEffect(() => {
@@ -87,9 +89,9 @@ export default function DocumentAnalysisPopup({ analysisResult, onConfirm, onCan
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <h2 className="text-xl font-semibold mb-4">Document Analysis Results</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="document-analysis-title">
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" ref={dialogRef} tabIndex={-1}>
+        <h2 id="document-analysis-title" className="text-xl font-semibold mb-4">Document Analysis Results</h2>
         
         {analysisResult?.summary && (
           <div className="mb-4 p-3 bg-blue-50 rounded-md">

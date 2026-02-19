@@ -10,8 +10,10 @@ import {
   validateExpiryDate,
   clampShelfLifeDays
 } from '../../../lib/validation';
+import { useDialogA11y } from '../../../lib/useDialogA11y';
 
 export default function GroceryItemPopup({ item, onConfirm, onCancel }) {
+  const dialogRef = useDialogA11y(true, onCancel);
   const [formData, setFormData] = useState({
     name: item?.name || '',
     category: item?.estimatedCategory || Category.OTHER,
@@ -87,8 +89,8 @@ export default function GroceryItemPopup({ item, onConfirm, onCancel }) {
   const expiryInfo = formData.expiryDate ? formatExpiryDate(formData.expiryDate) : null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="grocery-item-title">
+      <div className="w-full max-w-md" ref={dialogRef} tabIndex={-1}>
         <div className="relative" style={{ transform: 'rotate(-1deg)' }}>
           {/* Shadow */}
           <div className="absolute inset-0 bg-black/20 rounded-sm translate-y-2 translate-x-1" />
@@ -116,7 +118,7 @@ export default function GroceryItemPopup({ item, onConfirm, onCancel }) {
           <div className="relative bg-gradient-to-br from-yellow-100 via-yellow-50 to-amber-50 rounded-sm shadow-2xl p-6">
             {/* Header */}
             <div className="mb-4 pb-3 border-b-2 border-slate-300">
-              <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: "'Patrick Hand', cursive, sans-serif" }}>
+              <h2 id="grocery-item-title" className="text-xl font-bold text-slate-800" style={{ fontFamily: "'Patrick Hand', cursive, sans-serif" }}>
                 Confirm Item
               </h2>
             </div>

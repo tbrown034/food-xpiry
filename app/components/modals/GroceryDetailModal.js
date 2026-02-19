@@ -2,8 +2,11 @@
 
 import { formatGroceryName, formatCategoryName, formatCountdown, calculateHoursUntilExpiry } from '../../../lib/utils';
 import { StorageLocation } from '../../../lib/types';
+import { useDialogA11y } from '../../../lib/useDialogA11y';
 
 export default function GroceryDetailModal({ grocery, onEdit, onDelete, onMarkAsEaten, onMarkAsLeftover, onChangeLocation, onClose, isOpen }) {
+  const dialogRef = useDialogA11y(isOpen, onClose);
+
   if (!grocery || !isOpen) return null;
 
   // Check if item is already a leftover
@@ -62,8 +65,8 @@ export default function GroceryDetailModal({ grocery, onEdit, onDelete, onMarkAs
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={onClose}>
-      <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="grocery-detail-title">
+      <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()} ref={dialogRef} tabIndex={-1}>
         {/* Sticky Note Detail Card */}
         <div className="relative animate-scale-in" style={{ transform: 'rotate(-1deg)' }}>
           {/* Shadow */}
@@ -94,7 +97,7 @@ export default function GroceryDetailModal({ grocery, onEdit, onDelete, onMarkAs
             <div className="space-y-4">
               {/* Item Name & Status */}
               <div className="text-center border-b-2 border-slate-300 pb-4">
-                <h3 className="text-2xl font-bold text-slate-800 mb-2">
+                <h3 id="grocery-detail-title" className="text-2xl font-bold text-slate-800 mb-2">
                   {formatGroceryName(grocery.name)}
                 </h3>
                 <div className="flex items-center justify-center gap-2">

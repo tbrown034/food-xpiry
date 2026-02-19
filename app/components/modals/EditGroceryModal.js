@@ -9,8 +9,10 @@ import {
   validatePurchaseDate,
   validateExpiryDate
 } from '../../../lib/validation';
+import { useDialogA11y } from '../../../lib/useDialogA11y';
 
 export default function EditGroceryModal({ grocery, onSave, onCancel }) {
+  const dialogRef = useDialogA11y(true, onCancel);
   const [formData, setFormData] = useState({
     name: '',
     category: 'other',
@@ -105,9 +107,9 @@ export default function EditGroceryModal({ grocery, onSave, onCancel }) {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl">
-        <h2 className="text-2xl font-bold mb-6 text-gray-900">Edit Grocery Item</h2>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="edit-grocery-title">
+      <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl" ref={dialogRef} tabIndex={-1}>
+        <h2 id="edit-grocery-title" className="text-2xl font-bold mb-6 text-gray-900">Edit Grocery Item</h2>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name & Quantity Row */}

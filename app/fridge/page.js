@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'motion/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useGroceries, useToast, useModal, MODAL_TYPES } from '../context';
@@ -249,7 +250,12 @@ export default function FridgePage() {
   };
 
   return (
-    <div className="min-h-[calc(100dvh-64px)] bg-slate-900 flex flex-col">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, delay: 0.1 }}
+      className="min-h-[calc(100dvh-64px)] bg-slate-900 flex flex-col"
+    >
       <div className="flex-1 flex max-w-4xl w-full mx-auto">
         {/* Open Door Edge with Handle - LEFT side */}
         <Link
@@ -460,6 +466,6 @@ export default function FridgePage() {
         cancelText="Cancel"
         variant="danger"
       />
-    </div>
+    </motion.div>
   );
 }

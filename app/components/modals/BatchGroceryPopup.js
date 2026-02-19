@@ -11,6 +11,7 @@ import {
   validateExpiryDate,
   clampShelfLifeDays
 } from '../../../lib/validation';
+import { useDialogA11y } from '../../../lib/useDialogA11y';
 
 // Map lowercase API categories to Category enum values
 function normalizeCategory(apiCategory) {
@@ -38,6 +39,7 @@ function normalizeCategory(apiCategory) {
 }
 
 export default function BatchGroceryPopup({ batchResult, onConfirm, onCancel }) {
+  const dialogRef = useDialogA11y(true, onCancel);
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -206,7 +208,7 @@ export default function BatchGroceryPopup({ batchResult, onConfirm, onCancel }) 
   // Loading state - premium sticky note style
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-label="Loading shelf life data">
         <div className="relative" style={{ transform: 'rotate(-1deg)' }}>
           {/* Red magnet */}
           <Magnet
@@ -261,14 +263,14 @@ export default function BatchGroceryPopup({ batchResult, onConfirm, onCancel }) 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="batch-popup-title">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" ref={dialogRef} tabIndex={-1}>
 
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-slate-800 tracking-tight">
+              <h2 id="batch-popup-title" className="text-lg font-bold text-slate-800 tracking-tight">
                 Add to Kitchen?
               </h2>
               <p className="text-sm text-slate-500 mt-0.5">

@@ -196,11 +196,19 @@ export default function KitchenContents({
     return (
       <div
         onClick={handleItemClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleItemClick(e);
+          }
+        }}
         onMouseEnter={() => !item.eaten && setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
         onBlur={handleBlur}
         className="relative flex flex-col items-center cursor-pointer group"
         tabIndex={0}
+        role="button"
+        aria-label={`${item.name}, ${getDaysText(item)}. Click for details.`}
       >
         {/* Action buttons */}
         {!item.eaten && (
@@ -218,6 +226,7 @@ export default function KitchenContents({
                 onClick={(e) => handleMove(e, loc.id)}
                 className="w-7 h-7 rounded-full bg-slate-500/90 hover:bg-slate-600 text-white flex items-center justify-center shadow-md transition-all duration-200 ease-in-out hover:scale-105 active:scale-95 cursor-pointer text-xs"
                 title={`Move to ${loc.label}`}
+                aria-label={`Move ${item.name} to ${loc.label}`}
               >
                 {loc.icon}
               </button>
@@ -226,6 +235,7 @@ export default function KitchenContents({
               onClick={handleEat}
               className="w-8 h-8 rounded-full bg-emerald-500/90 hover:bg-emerald-600 text-white flex items-center justify-center shadow-md transition-all duration-200 ease-in-out hover:scale-105 active:scale-95 cursor-pointer"
               title="Mark as eaten"
+              aria-label={`Mark ${item.name} as eaten`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -235,6 +245,7 @@ export default function KitchenContents({
               onClick={handleDelete}
               className="w-8 h-8 rounded-full bg-slate-400/90 hover:bg-rose-500 text-white flex items-center justify-center shadow-md transition-all duration-200 ease-in-out hover:scale-105 active:scale-95 cursor-pointer"
               title="Delete"
+              aria-label={`Delete ${item.name}`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -287,17 +298,17 @@ export default function KitchenContents({
             {item.name}
           </span>
           <span className={`
-            text-[9px] sm:text-[10px] font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block
+            text-[10px] sm:text-[11px] font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block
             ${urgencyStyle.badge}
           `}>
             {getDaysText(item)}
           </span>
           {item.source && !item.eaten && (
             <span className={`
-              block text-[7px] mt-0.5 font-medium
-              ${item.source === 'AI' ? 'text-purple-500' :
-                item.source === 'default' || item.source === 'USDA Food Safety Guidelines' ? 'text-orange-400' :
-                'text-slate-400'}
+              block text-[10px] mt-0.5 font-medium
+              ${item.source === 'AI' ? 'text-purple-700' :
+                item.source === 'default' || item.source === 'USDA Food Safety Guidelines' ? 'text-orange-600' :
+                'text-slate-500'}
             `}>
               {item.source === 'USDA' ? '✓ USDA' :
                item.source === 'FDA' ? '✓ FDA' :
